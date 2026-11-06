@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Prilixor.VendorDesk.Api/Prilixor.VendorDesk.Api.csproj" />
+    <Project Path="src/Prilixor.VendorDesk.Application/Prilixor.VendorDesk.Application.csproj" />
+    <Project Path="src/Prilixor.VendorDesk.Domain/Prilixor.VendorDesk.Domain.csproj" />
+    <Project Path="src/Prilixor.VendorDesk.Infrastructure/Prilixor.VendorDesk.Infrastructure.csproj" />
+    <Project Path="src/Prilixor.VendorDesk.Tests/Prilixor.VendorDesk.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+**/mailbox/
+web/node_modules/
+web/dist/
+*.user
+appsettings.*.local.json
+**/appsettings.Production.json
+speech-credentials.json
