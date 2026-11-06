@@ -155,9 +155,15 @@ export function startDictation(options: DictationOptions): Dictation {
         return
       }
       await context.resume()
+      if (closed) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
       attach(context.sampleRate || 16000)
+      if (closed) return
       options.onListen(true)
       options.onStatus(options.listeningMessage)
+      if (closed) return
       window.clearTimeout(cap)
       cap = window.setTimeout(() => finish(false), maxMs)
     } catch {

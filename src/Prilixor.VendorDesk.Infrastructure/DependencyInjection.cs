@@ -8,6 +8,7 @@ using Prilixor.VendorDesk.Domain;
 using Prilixor.VendorDesk.Infrastructure.Auth;
 using Prilixor.VendorDesk.Infrastructure.Persistence;
 using Prilixor.VendorDesk.Infrastructure.Speech;
+using Prilixor.VendorDesk.Infrastructure.Storage;
 
 namespace Prilixor.VendorDesk.Infrastructure;
 
@@ -26,6 +27,9 @@ public static class DependencyInjection
         services.AddScoped<IDeskStore, DeskStore>();
         services.AddScoped<IInventoryReader, InventoryReader>();
         services.AddScoped<IShopDesk, ShopDesk>();
+        var storage = S3StorageOptions.Read(configuration);
+        var useS3 = StorageReady(storage, development);
+        services.AddSingleton<IRentalPhotoStore>(_ => new RentalPhotoStore(storage, contentRoot, useS3));
         services.AddSingleton<ITokenHasher>(_ => new TokenHasher(pepper));
         var apiKey = configuration["ShreeSms:ApiKey"];
         var senderId = configuration["ShreeSms:SenderId"];
@@ -42,6 +46,17 @@ public static class DependencyInjection
         var speechFile = string.IsNullOrWhiteSpace(speechPath) ? "" : Path.IsPathRooted(speechPath) ? speechPath : Path.Combine(contentRoot, speechPath);
         services.AddSingleton<ISpeechTranscriber>(_ => new GoogleSpeechTranscriber(speechFile));
         return services;
+    }
+
+    private static bool StorageReady(S3StorageOptions storage, bool development)
+    {
+        if (!storage.Enabled || string.IsNullOrWhiteSpace(storage.BucketName)) return false;
+        if (!development) return true;
+        if (!string.IsNullOrWhiteSpace(storage.AccessKeyId) && !string.IsNullOrWhiteSpace(storage.SecretAccessKey)) return true;
+        var key = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
+        var secret = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
+        if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(secret)) return true;
+        return !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AWS_PROFILE"));
     }
 
     public static async Task SeedCatalog(this VendorDeskDbContext db, CancellationToken cancellationToken)

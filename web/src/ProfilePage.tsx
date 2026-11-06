@@ -44,7 +44,7 @@ export function ProfilePage({ vendor, onSaved }: { vendor: Vendor; onSaved: (ven
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="min-w-0 w-full">
       <PageHeader title="Business details" subtitle="The shop name, address, phone, and logo print on every invoice. GST and discount are the starting values for a new rental." />
       <form className="space-y-4" onSubmit={(event) => void submit(event)}>
         <section className="rounded-lg border bg-white p-4">
@@ -99,7 +99,7 @@ export function ProfilePage({ vendor, onSaved }: { vendor: Vendor; onSaved: (ven
           <div className="mt-3 border-t pt-3 text-xs text-[var(--muted)]">A new rental starts at {form.taxPercent || '0'}% GST and {form.discountPercent || '0'}% discount.</div>
         </section>
 
-        <div className="sticky bottom-16 z-20 -mx-4 border-t bg-[var(--background)]/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
+        <div className="sticky bottom-0 z-20 -mx-4 border-t bg-[var(--background)]/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:px-0">
           {error ? <p className="mb-2 text-sm text-[var(--danger)]">{error}</p> : null}
           {saved ? <p className="mb-2 text-sm text-[var(--success)]">{saved}</p> : null}
           <PrimaryButton disabled={busy} type="submit">{busy ? 'Saving…' : 'Save business details'}</PrimaryButton>

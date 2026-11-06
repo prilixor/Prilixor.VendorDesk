@@ -29,7 +29,7 @@ export function Shell({ vendor, onSignOut, children }: { vendor: Vendor; onSignO
     navigate('/login', { replace: true })
   }
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-dvh min-h-0 flex-col print:block print:h-auto md:h-auto md:min-h-screen md:flex-row">
       <aside className="no-print hidden w-60 shrink-0 flex-col text-[var(--sidebar-foreground)] md:flex" style={{ background: 'var(--sidebar)' }}>
         <div className="flex items-center gap-2 px-5 py-5">
           {vendor.logo ? <ShopLogo logo={vendor.logo} name={vendor.businessName} className="size-9 rounded-md" /> : <img src="/bm-icon.png" alt="BlinksMed" className="size-9 rounded-md" />}
@@ -51,8 +51,8 @@ export function Shell({ vendor, onSignOut, children }: { vendor: Vendor; onSignO
           <button className="mt-3 flex items-center gap-2 text-sm" type="button" onClick={() => void signOut()}><LogOut className="size-4" /> Sign out</button>
         </div>
       </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="no-print sticky top-0 z-30 flex items-center gap-3 px-4 py-3 text-white md:hidden" style={{ background: 'var(--sidebar)' }}>
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+        <header className="no-print flex shrink-0 items-center gap-3 px-4 py-3 text-white md:hidden" style={{ background: 'var(--sidebar)' }}>
           {vendor.logo ? <ShopLogo logo={vendor.logo} name={vendor.businessName} className="size-8 shrink-0 rounded-md" /> : <img src="/bm-icon.png" alt="BlinksMed" className="size-8 shrink-0 rounded-md" />}
           <div className="min-w-0 flex-1">
             <div className="font-semibold leading-tight">Vendor Desk</div>
@@ -60,8 +60,8 @@ export function Shell({ vendor, onSignOut, children }: { vendor: Vendor; onSignO
           </div>
           <button className="flex shrink-0 items-center gap-1.5 rounded-md bg-white/15 px-3 py-2 text-sm font-medium" type="button" onClick={() => void signOut()}><LogOut className="size-4" /> Sign out</button>
         </header>
-        <main className="min-w-0 flex-1 px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-8">{children}</main>
-        <nav className="no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-white md:hidden">
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 py-5 print:h-auto print:overflow-visible md:overflow-visible md:px-8 md:py-8">{children}</main>
+        <nav className="no-print grid shrink-0 grid-cols-4 border-t bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
           {links.map((link) => (
             <NavLink key={link.to} to={link.to} className={() => `flex min-w-0 flex-col items-center gap-1 px-1 py-2 text-[10px] leading-tight ${linkActive(link.to, path) ? 'text-[var(--primary)]' : 'text-[var(--muted)]'}`}>
               <link.icon className="size-5 shrink-0" /> <span className="max-w-full truncate">{link.short}</span>

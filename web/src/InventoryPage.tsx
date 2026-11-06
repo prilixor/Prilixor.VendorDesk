@@ -114,7 +114,7 @@ export function InventoryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="min-w-0 w-full">
       <PageHeader title="Inventory" subtitle="Set the daily rent, how many you have in the shop, and the refundable deposit. Offered products appear when you create a rental." />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -190,7 +190,7 @@ function ProductCard({ row, draft, saving, justSaved, error, onChange, onSave }:
 
   return (
     <form onSubmit={submit} className={`rounded-lg border bg-white p-4 ${dirty ? 'ring-2 ring-[var(--primary)]/25' : ''} ${accent(status)}`}>
-      <div className="grid gap-4 xl:grid-cols-[240px_minmax(0,1fr)_210px] xl:items-center">
+      <div className="grid gap-4 lg:grid-cols-[minmax(200px,280px)_minmax(0,1fr)_220px] lg:items-center">
         <div>
           <h3 className="font-medium leading-snug">{row.productName}</h3>
           <div className="mt-1.5"><StatusPill status={dirty ? 'unsaved' : status} /></div>
@@ -219,7 +219,7 @@ function ProductCard({ row, draft, saving, justSaved, error, onChange, onSave }:
           </Field>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between xl:flex-col xl:items-stretch">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:flex-col lg:items-stretch">
           <button type="button" role="switch" aria-checked={draft.active} aria-label={`Offer ${row.productName} on New Rental`} onClick={() => onChange({ ...draft, active: !draft.active })} className="flex items-center gap-3 text-left">
             <span className={`relative h-6 w-11 shrink-0 rounded-full ${draft.active ? 'bg-[var(--primary)]' : 'bg-slate-300'}`}>
               <span className={`absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform ${draft.active ? 'translate-x-5' : ''}`} />
@@ -232,7 +232,7 @@ function ProductCard({ row, draft, saving, justSaved, error, onChange, onSave }:
           {dirty ? (
             <button className="h-10 rounded-md bg-[var(--primary)] px-4 text-sm font-semibold text-white disabled:opacity-40" type="submit" disabled={saving || !!problem}>{saving ? 'Saving…' : 'Save changes'}</button>
           ) : justSaved ? (
-            <span className="inline-flex h-10 items-center gap-1 text-sm font-medium text-[var(--success)] xl:justify-end"><Check className="size-4" /> Saved</span>
+            <span className="inline-flex h-10 items-center gap-1 text-sm font-medium text-[var(--success)] lg:justify-end"><Check className="size-4" /> Saved</span>
           ) : null}
         </div>
       </div>

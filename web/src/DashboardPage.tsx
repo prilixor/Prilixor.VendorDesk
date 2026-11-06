@@ -41,7 +41,7 @@ export function DashboardPage({ vendor }: { vendor: Vendor }) {
     { label: 'Rental revenue', value: inr(revenue), icon: IndianRupee },
   ]
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="min-w-0 w-full">
       <PageHeader mark={vendor.logo ? <ShopLogo logo={vendor.logo} name={vendor.businessName} className="size-12 rounded-md border" /> : undefined} title={`${greeting()}, ${name}`} subtitle={vendor.businessName} action={<Link className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white" to="/rentals/new"><PlusCircle className="size-4" /> New Rental</Link>} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((stat) => (

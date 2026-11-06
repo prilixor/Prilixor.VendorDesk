@@ -6,8 +6,10 @@ using Microsoft.EntityFrameworkCore;
 using Prilixor.VendorDesk.Api.Endpoints;
 using Prilixor.VendorDesk.Application;
 using Prilixor.VendorDesk.Application.Auth;
+using Prilixor.VendorDesk.Application.Rentals;
 using Prilixor.VendorDesk.Infrastructure;
 using Prilixor.VendorDesk.Infrastructure.Persistence;
+using Prilixor.VendorDesk.Infrastructure.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddVendorDeskApplication();
@@ -33,6 +35,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 var app = builder.Build();
 app.UseForwardedHeaders();
 app.UseCors("web");
+app.UseStaticFiles();
 app.Use(async (context, next) =>
 {
     if (context.Request.Cookies.TryGetValue(SessionCookies.Name, out var token) && !string.IsNullOrWhiteSpace(token))
@@ -59,6 +62,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<VendorDeskDbContext>();
     await db.Database.MigrateAsync();
     await db.SeedCatalog(CancellationToken.None);
+    await RentalPhotoMigration.MoveActivePhotos(db, scope.ServiceProvider.GetRequiredService<IRentalPhotoStore>(), CancellationToken.None);
 }
 
 app.Run();

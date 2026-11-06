@@ -114,6 +114,8 @@ export function MicField({ id, label, value, onChange, kind = 'text', error, opt
   const phase = useRef<'idle' | 'listen' | 'work'>('idle')
   const mounted = useRef(true)
   const live = listening || status.startsWith('Listening')
+  const liveRef = useRef(live)
+  liveRef.current = live
 
   useEffect(() => () => {
     mounted.current = false
@@ -123,24 +125,24 @@ export function MicField({ id, label, value, onChange, kind = 'text', error, opt
   useEffect(() => {
     if (!status.startsWith('Listening')) return
     const timer = window.setTimeout(() => {
-      if (phase.current !== 'listen') return
       session.current?.stop()
       window.setTimeout(() => {
-        if (phase.current !== 'listen') return
+        if (phase.current === 'idle') return
+        if (!liveRef.current) return
         session.current = null
         phase.current = 'idle'
         setListening(false)
         setStatus('')
-        setHint('The microphone did not respond. Tap it and speak again.')
-      }, 400)
-    }, 16000)
+        setHint('The microphone did not finish. Tap it and speak again.')
+      }, 800)
+    }, 10000)
     return () => window.clearTimeout(timer)
   }, [status])
 
   function listen(event: { preventDefault: () => void; stopPropagation: () => void }) {
     event.preventDefault()
     event.stopPropagation()
-    if (phase.current === 'listen') {
+    if (phase.current === 'listen' || status.startsWith('Listening')) {
       phase.current = 'work'
       setListening(false)
       setHint('')
@@ -160,6 +162,7 @@ export function MicField({ id, label, value, onChange, kind = 'text', error, opt
       onListen: (on) => { if (mounted.current && session.current === mine && phase.current === 'listen') setListening(on) },
       onStatus: (message) => {
         if (!mounted.current || session.current !== mine) return
+        if (message.startsWith('Listening') && phase.current === 'work') return
         if (message.startsWith('Working')) {
           phase.current = 'work'
           setListening(false)

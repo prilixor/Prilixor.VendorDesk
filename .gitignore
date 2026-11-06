@@ -8,3 +8,4 @@ web/dist/
 appsettings.*.local.json
 **/appsettings.Production.json
 speech-credentials.json
+**/wwwroot/uploads/

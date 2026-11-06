@@ -6,7 +6,7 @@ using Prilixor.VendorDesk.Domain;
 
 namespace Prilixor.VendorDesk.Infrastructure.Persistence;
 
-public sealed class ShopDesk(VendorDeskDbContext db) : IShopDesk
+public sealed class ShopDesk(VendorDeskDbContext db, IRentalPhotoStore photos) : IShopDesk
 {
     public async Task<VendorProfile?> SaveProfile(SaveProfileCommand command, CancellationToken cancellationToken)
     {
@@ -140,25 +140,45 @@ public sealed class ShopDesk(VendorDeskDbContext db) : IShopDesk
             IssuerPhone = vendor.Phone,
             IssuerGstin = vendor.Gstin
         };
-        foreach (var item in command.Items)
+        var uploaded = new List<string>();
+        try
         {
-            rental.Lines.Add(new RentalLine
+            foreach (var item in command.Items)
             {
-                Id = Guid.NewGuid(),
-                RentalId = rental.Id,
-                ProductId = item.ProductId,
-                Name = products.First(product => product.Id == item.ProductId).Name,
-                Quantity = item.Quantity,
-                Days = item.Days,
-                StartDate = item.StartDate,
-                PricePerDay = decimal.Round(item.PricePerDay, 2, MidpointRounding.AwayFromZero),
-                DepositPerUnit = decimal.Round(item.DepositPerUnit, 2, MidpointRounding.AwayFromZero),
-                Photo = string.IsNullOrWhiteSpace(item.Photo) ? null : item.Photo
-            });
+                var line = new RentalLine
+                {
+                    Id = Guid.NewGuid(),
+                    RentalId = rental.Id,
+                    ProductId = item.ProductId,
+                    Name = products.First(product => product.Id == item.ProductId).Name,
+                    Quantity = item.Quantity,
+                    Days = item.Days,
+                    StartDate = item.StartDate,
+                    PricePerDay = decimal.Round(item.PricePerDay, 2, MidpointRounding.AwayFromZero),
+                    DepositPerUnit = decimal.Round(item.DepositPerUnit, 2, MidpointRounding.AwayFromZero)
+                };
+                if (!string.IsNullOrWhiteSpace(item.Photo))
+                {
+                    var key = await photos.SaveAsync(command.VendorId, line.Id, item.Photo, cancellationToken);
+                    line.Photo = key;
+                    if (key is not null) uploaded.Add(key);
+                }
+                rental.Lines.Add(line);
+            }
+            db.Rentals.Add(rental);
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
-        db.Rentals.Add(rental);
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        catch (RentalPhotoException ex)
+        {
+            await photos.DeleteAsync(uploaded, CancellationToken.None);
+            return Result.Failure<RentalDetailDto>(new Error("photo.save", ex.Message, ErrorCategory.Validation));
+        }
+        catch
+        {
+            await photos.DeleteAsync(uploaded, CancellationToken.None);
+            throw;
+        }
         return Result.Success(Map(rental, customer.Id));
     }
 
@@ -179,6 +199,15 @@ public sealed class ShopDesk(VendorDeskDbContext db) : IShopDesk
             stock.Quantity += line.Quantity;
             stock.UpdatedAt = DateTimeOffset.UtcNow;
         }
+        try
+        {
+            await photos.DeleteAsync(rental.Lines.Select(line => line.Photo), cancellationToken);
+        }
+        catch (RentalPhotoException ex)
+        {
+            return Result.Failure<RentalDetailDto>(new Error("photo.remove", ex.Message, ErrorCategory.Conflict));
+        }
+        foreach (var line in rental.Lines) line.Photo = null;
         rental.ReturnedOn = RentalMath.IndiaToday();
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -196,7 +225,7 @@ public sealed class ShopDesk(VendorDeskDbContext db) : IShopDesk
         customer.RefRelation = input.RefRelation.Trim();
     }
 
-    private static RentalDetailDto Map(Rental rental, Guid customerId = default)
+    private RentalDetailDto Map(Rental rental, Guid customerId = default)
     {
         var today = RentalMath.IndiaToday();
         var lines = rental.Lines.Select(line => new RentalLineDto(
@@ -209,7 +238,7 @@ public sealed class ShopDesk(VendorDeskDbContext db) : IShopDesk
             line.PricePerDay,
             line.DepositPerUnit,
             RentalMath.LineCharge(line.Quantity, line.Days, line.PricePerDay),
-            line.Photo)).ToList();
+            photos.Display(line.Photo))).ToList();
         var inputs = lines.Select(line => new RentalLineInput(line.Quantity, line.Days, line.PricePerDay, line.DepositPerUnit)).ToList();
         return new RentalDetailDto(
             rental.Id,

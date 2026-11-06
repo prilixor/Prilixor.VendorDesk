@@ -164,6 +164,7 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
     }
     setErrors({})
     setStep((current) => current + 1)
+    document.querySelector('main')?.scrollTo({ top: 0 })
     window.scrollTo({ top: 0 })
   }
 
@@ -190,9 +191,9 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="min-w-0 w-full">
       <PageHeader title="New Rental" subtitle="A walk-in rental for a customer at the counter." />
-      <RentalSteps step={step} onSelect={(index) => { if (index < step) { setErrors({}); setStep(index); window.scrollTo({ top: 0 }) } }} />
+      <RentalSteps step={step} onSelect={(index) => { if (index < step) { setErrors({}); setStep(index); document.querySelector('main')?.scrollTo({ top: 0 }); window.scrollTo({ top: 0 }) } }} />
 
       {step === 0 ? (
         <section className="rounded-lg border bg-white p-4 md:p-6">
@@ -232,8 +233,8 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
       ) : null}
 
       {step === 1 ? (
-        <section className="space-y-4">
-          <div className="rounded-lg border bg-white p-4">
+        <section className="min-w-0 space-y-4">
+          <div className="min-w-0 rounded-lg border bg-white p-4">
             <div className="mb-3 flex items-center justify-between text-sm font-medium"><span>Add from your stock</span>{items.length > 0 ? <span className="text-xs text-[var(--primary)]">{items.length} selected</span> : null}</div>
             <div className="relative mb-3">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[var(--muted)]" />
@@ -241,13 +242,13 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
             </div>
             <CategoryPicker className="mb-3" categories={categories} counts={categoryCounts} value={category} onChange={(name) => { setCategory(name); setProductPage(0) }} />
             <div className="mb-3 flex items-center justify-between text-xs text-[var(--muted)]"><span>{catalog.length} products</span><label className="flex items-center gap-2"><input type="checkbox" checked={availableOnly} onChange={(event) => { setAvailableOnly(event.target.checked); setProductPage(0) }} /> In stock only</label></div>
-            <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {productResults.rows.map((row) => {
                 const added = items.some((item) => item.productId === row.productId)
                 const out = row.quantity <= 0
                 return (
-                  <button key={row.productId} type="button" disabled={added || out} className={`flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm disabled:opacity-50 ${added ? 'border-[var(--primary)] bg-[var(--accent)]' : ''}`} onClick={() => addProduct(row)}>
-                    <span className="min-w-0"><span className="block truncate font-medium leading-5">{row.productName}</span><span className="block truncate text-xs leading-4 text-[var(--muted)]">{row.categoryName} · {out ? 'Out of stock' : `${row.quantity} available`}</span></span>
+                  <button key={row.productId} type="button" disabled={added || out} className={`flex w-full min-w-0 max-w-full items-center gap-3 overflow-hidden rounded-md border px-3 py-2 text-left text-sm disabled:opacity-50 ${added ? 'border-[var(--primary)] bg-[var(--accent)]' : ''}`} onClick={() => addProduct(row)}>
+                    <span className="min-w-0 flex-1"><span className="block truncate font-medium leading-5">{row.productName}</span><span className="block truncate text-xs leading-4 text-[var(--muted)]">{row.categoryName} · {out ? 'Out of stock' : `${row.quantity} available`}</span></span>
                     {added ? <Check className="size-4 shrink-0 text-[var(--primary)]" /> : <Plus className="size-4 shrink-0 text-[var(--primary)]" />}
                   </button>
                 )
@@ -257,9 +258,9 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
             <Pager {...productResults} size={9} onChange={setProductPage} />
           </div>
           {items.map((item, index) => (
-            <div key={item.productId} className="rounded-lg border bg-white p-4">
-              <div className="mb-3 flex items-start justify-between">
-                <div><div className="font-medium">{item.name}</div><div className="text-xs text-[var(--muted)]">{inr(item.pricePerDay)}/day{item.depositPerUnit ? ` · Deposit ${inr(item.depositPerUnit)}/unit` : ''}</div></div>
+            <div key={item.productId} className="min-w-0 rounded-lg border bg-white p-4">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0"><div className="break-words font-medium">{item.name}</div><div className="text-xs text-[var(--muted)]">{inr(item.pricePerDay)}/day{item.depositPerUnit ? ` · Deposit ${inr(item.depositPerUnit)}/unit` : ''}</div></div>
                 <button type="button" aria-label="Remove" onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 className="size-4" /></button>
               </div>
               <div className="mb-4"><ProductPhoto name={item.name} photo={item.photo} onChange={(photo) => update(index, { photo })} /></div>
@@ -277,10 +278,10 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
                   </div>
                 </div>
                 <div className="grid min-w-0 gap-1.5 text-sm font-semibold">
-                  <span className="flex h-8 items-center justify-between gap-2">
-                    <span className="truncate">Duration</span>
-                    <span className="grid h-8 shrink-0 grid-cols-3 overflow-hidden rounded-md border text-xs font-normal" role="group" aria-label="Duration in days">
-                      {durations.map((days) => <button key={days} className={`px-2 ${item.days === days ? 'bg-[var(--primary)] text-white' : ''}`} type="button" aria-pressed={item.days === days} onClick={() => update(index, { days })}>{days} days</button>)}
+                  <span className="flex min-h-8 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>Duration</span>
+                    <span className="grid h-8 w-full grid-cols-3 overflow-hidden rounded-md border text-xs font-normal sm:w-auto" role="group" aria-label="Duration in days">
+                      {durations.map((days) => <button key={days} className={`min-w-0 truncate px-1 sm:px-2 ${item.days === days ? 'bg-[var(--primary)] text-white' : ''}`} type="button" aria-pressed={item.days === days} onClick={() => update(index, { days })}>{days} days</button>)}
                     </span>
                   </span>
                   <input className="h-10 w-full min-w-0 rounded-md border px-3 font-normal" aria-label="Duration in days" type="number" min={1} value={item.days || ''} onChange={(event) => update(index, { days: Number(event.target.value) })} />
