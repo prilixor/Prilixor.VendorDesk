@@ -1,9 +1,9 @@
 import { api, ApiError } from './api'
-import { formatHeard } from './heard'
+import { bestLine, combineHeard, spokenField } from './heard'
 
-export type Dictation = { stop: () => void; cancel: () => void }
+export type Dictation = { stop: () => void; cancel: () => void; hasAudio: () => boolean }
 
-type DictationOptions = {
+export type DictationOptions = {
   kind: 'text' | 'phone' | 'email'
   multiline: boolean
   listeningMessage: string
@@ -14,22 +14,347 @@ type DictationOptions = {
   onEnd: () => void
 }
 
-type MicHandle = { stop: () => void; cancel: () => void; hasAudio: () => boolean }
+export type Clock = {
+  setTimeout: (fn: () => void, ms: number) => number
+  clearTimeout: (id: number) => void
+}
+
+export type RecognitionEvent = {
+  results: { isFinal: boolean; alternatives: { transcript?: string; confidence?: number }[] }[]
+}
+
+export type SpeechEngine = {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  maxAlternatives: number
+  start: () => void
+  stop: () => void
+  abort: () => void
+  onresult: ((event: RecognitionEvent) => void) | null
+  onspeechstart: (() => void) | null
+  onspeechend: (() => void) | null
+  onerror: ((event: { error: string }) => void) | null
+  onend: (() => void) | null
+}
+
+type BrowserRecognition = {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  maxAlternatives: number
+  start: () => void
+  stop: () => void
+  abort: () => void
+  onresult: ((event: { results: ArrayLike<{ isFinal: boolean; length: number; [index: number]: { transcript?: string; confidence?: number } }> }) => void) | null
+  onspeechstart: (() => void) | null
+  onspeechend: (() => void) | null
+  onerror: ((event: { error?: string }) => void) | null
+  onend: (() => void) | null
+}
+
+const windowClock: Clock = {
+  setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+  clearTimeout: (id) => window.clearTimeout(id),
+}
 
 function registry() {
-  const host = window as Window & { __vendorDeskMic?: { current: MicHandle | null } }
+  const host = globalThis as typeof globalThis & { __vendorDeskMic?: { current: Dictation | null } }
   host.__vendorDeskMic ??= { current: null }
   return host.__vendorDeskMic
 }
 
-/** Records until the speaker pauses or taps again, then asks Google for the words. */
+type MicSeat = { id: string, silence: () => void, stop: () => void }
+let seat: MicSeat | null = null
+const seatWatchers = new Set<() => void>()
+
+function notifySeat() {
+  for (const listener of seatWatchers) listener()
+}
+
+export function subscribeMic(listener: () => void) {
+  seatWatchers.add(listener)
+  return () => { seatWatchers.delete(listener) }
+}
+
+export function micIsOn(id: string) {
+  return seat?.id === id
+}
+
+/** Shows Listening on this field only, and turns the previous field off immediately. */
+export function seatMic(id: string, api: { silence: () => void, stop: () => void }) {
+  const previous = seat
+  seat = { id, ...api }
+  notifySeat()
+  if (!previous || previous.id === id) return
+  try { previous.stop() } catch { /* the previous microphone already closed */ }
+  previous.silence()
+}
+
+export function unseatMic(id: string) {
+  if (seat?.id !== id) return
+  seat = null
+  notifySeat()
+}
+
+export function microphoneBlockedMessage(page: { protocol: string; host: string } = window.location): string {
+  return `The microphone is blocked on ${page.protocol}//${page.host}. Open https://${page.host}, continue past the certificate warning once, then tap the mic again.`
+}
+
+/** Records until the speaker pauses or taps again, then writes the words into the field. */
 export function startDictation(options: DictationOptions): Dictation {
   const previous = registry().current
   registry().current = null
   if (previous?.hasAudio()) previous.stop()
   else previous?.cancel()
 
-  const context = new AudioContext({ sampleRate: 16000 })
+  const handle = openSession(options)
+  registry().current = handle
+  return handle
+}
+
+export function dictationRoute(secure: boolean, hasBrowserSpeech: boolean): 'browser' | 'blocked' | 'server' {
+  if (!secure) return 'blocked'
+  return hasBrowserSpeech ? 'browser' : 'server'
+}
+
+/** Turns off whichever field is listening, and keeps the words already written. */
+export function stopActiveDictation() {
+  const current = registry().current
+  if (!current) return
+  if (current.hasAudio()) current.stop()
+  else current.cancel()
+}
+
+function openSession(options: DictationOptions): Dictation {
+  const secure = Boolean(globalThis.isSecureContext)
+  const engine = secure ? browserEngine() : null
+  const route = dictationRoute(secure, engine !== null)
+  if (route === 'blocked') return failDictation(options, microphoneBlockedMessage())
+  if (route === 'browser' && engine) return listenWithEngine(engine, options)
+  return recordDictation(options)
+}
+
+function failDictation(options: DictationOptions, message: string): Dictation {
+  let dropped = false
+  let done = false
+  const handle: Dictation = {
+    hasAudio: () => false,
+    stop() { finish() },
+    cancel() { dropped = true; finish() },
+  }
+  function finish() {
+    if (done) return
+    done = true
+    if (registry().current === handle) registry().current = null
+    options.onListen(false)
+    if (!dropped) options.onError(message)
+    options.onEnd()
+  }
+  queueMicrotask(finish)
+  return handle
+}
+
+function browserEngine(): SpeechEngine | null {
+  const host = window as Window & {
+    SpeechRecognition?: new () => BrowserRecognition
+    webkitSpeechRecognition?: new () => BrowserRecognition
+  }
+  const Ctor = host.SpeechRecognition ?? host.webkitSpeechRecognition
+  if (!Ctor) return null
+  const raw = new Ctor()
+  const engine: SpeechEngine = {
+    get lang() { return raw.lang },
+    set lang(value: string) { raw.lang = value },
+    get continuous() { return raw.continuous },
+    set continuous(value: boolean) { raw.continuous = value },
+    get interimResults() { return raw.interimResults },
+    set interimResults(value: boolean) { raw.interimResults = value },
+    get maxAlternatives() { return raw.maxAlternatives },
+    set maxAlternatives(value: number) { raw.maxAlternatives = value },
+    onresult: null,
+    onspeechstart: null,
+    onspeechend: null,
+    onerror: null,
+    onend: null,
+    start() { raw.start() },
+    stop() { raw.stop() },
+    abort() { raw.abort() },
+  }
+  raw.onresult = (event) => {
+    const results = []
+    for (let index = 0; index < event.results.length; index++) {
+      const result = event.results[index]
+      const alternatives = []
+      for (let choice = 0; choice < result.length; choice++) {
+        const alternative = result[choice]
+        alternatives.push({ transcript: alternative?.transcript ?? '', confidence: alternative?.confidence ?? 0 })
+      }
+      results.push({ isFinal: Boolean(result.isFinal), alternatives })
+    }
+    engine.onresult?.({ results })
+  }
+  raw.onspeechstart = () => engine.onspeechstart?.()
+  raw.onspeechend = () => engine.onspeechend?.()
+  raw.onerror = (event) => engine.onerror?.({ error: event.error ?? '' })
+  raw.onend = () => engine.onend?.()
+  return engine
+}
+
+function sameWords(previous: string, next: string) {
+  const key = (value: string) => value.toLowerCase().replace(/[^a-z0-9@.\s]/g, '').replace(/\s+/g, ' ').trim()
+  return key(previous) === key(next)
+}
+
+export function listenWithEngine(engine: SpeechEngine, options: DictationOptions, clock: Clock = windowClock): Dictation {
+  const maxMs = 60000
+  let stable = ''
+  let sessionFinal = ''
+  let interim = ''
+  let heard = false
+  let stopped = false
+  let dropped = false
+  let finished = false
+  let error = ''
+  let emptyEnds = 0
+  let lastRaw = ''
+  let maxTimer = 0
+  let restartTimer = 0
+
+  const handle: Dictation = {
+    hasAudio: () => heard,
+    stop() { requestStop(false) },
+    cancel() { dropped = true; requestStop(true) },
+  }
+
+  function clearTimers() {
+    clock.clearTimeout(maxTimer)
+    clock.clearTimeout(restartTimer)
+  }
+
+  function currentText() {
+    return spokenField(combineHeard(stable, sessionFinal, interim), options.kind)
+  }
+
+  function finish() {
+    if (finished) return
+    finished = true
+    stopped = true
+    clearTimers()
+    if (registry().current === handle) registry().current = null
+    options.onListen(false)
+    if (!dropped) {
+      const text = currentText()
+      if (text) options.onText(text)
+      else options.onError(error || 'Could not hear that. Tap the mic and speak again.')
+    }
+    options.onEnd()
+  }
+
+  function requestStop(discard: boolean) {
+    if (finished) return
+    stopped = true
+    if (discard) dropped = true
+    finish()
+    try {
+      if (discard) engine.abort()
+      else engine.stop()
+    } catch { /* the browser already closed the microphone */ }
+  }
+
+  engine.lang = 'en-IN'
+  engine.continuous = true
+  engine.interimResults = true
+  engine.maxAlternatives = 3
+  engine.onspeechstart = () => { /* a pause is not the end; the next tap stops the mic */ }
+  engine.onspeechend = () => { /* keep listening until the mic is tapped again */ }
+  engine.onresult = (event) => {
+    if (finished || dropped) return
+    sessionFinal = ''
+    interim = ''
+    let final = false
+    for (const result of event.results) {
+      const line = bestLine(result.alternatives, options.kind)
+      if (!line) continue
+      if (result.isFinal) {
+        final = true
+        sessionFinal = combineHeard(sessionFinal, line)
+      } else interim = combineHeard(interim, line)
+    }
+    const raw = combineHeard(stable, sessionFinal, interim)
+    if (!raw || (sameWords(lastRaw, raw) && !final)) return
+    lastRaw = raw
+    heard = true
+    emptyEnds = 0
+    const text = spokenField(raw, options.kind)
+    if (text) options.onText(text)
+  }
+  engine.onerror = (event) => {
+    if (finished || dropped) return
+    const code = event.error
+    if (code === 'aborted' || code === 'no-speech') return
+    if (code === 'language-not-supported' && engine.lang !== 'en-US') {
+      engine.lang = 'en-US'
+      return
+    }
+    stopped = true
+    error = code === 'not-allowed' || code === 'service-not-allowed'
+      ? 'Allow the microphone for this site, then tap the mic again.'
+      : code === 'audio-capture'
+        ? 'No microphone was found. Check the microphone and tap it again.'
+        : code === 'network'
+          ? 'Voice recognition needs an internet connection. Check the connection and tap the mic again.'
+          : 'Voice recognition could not hear that. Tap the mic and speak again.'
+    finish()
+  }
+  engine.onend = () => {
+    if (finished) return
+    stable = combineHeard(stable, sessionFinal, interim)
+    sessionFinal = ''
+    interim = ''
+    if (dropped || stopped) {
+      finish()
+      return
+    }
+    if (!currentText()) {
+      emptyEnds += 1
+      if (emptyEnds >= 3) {
+        error = error || 'Could not hear that. Tap the mic and speak again.'
+        finish()
+        return
+      }
+    }
+    restartTimer = clock.setTimeout(() => {
+      if (finished || stopped || dropped) return
+      try { engine.start() } catch {
+        error = 'Allow the microphone for this site, then tap the mic again.'
+        finish()
+      }
+    }, 120)
+  }
+
+  maxTimer = clock.setTimeout(() => requestStop(false), maxMs)
+  clock.setTimeout(() => {
+    if (finished) return
+    options.onListen(true)
+    options.onStatus(options.listeningMessage)
+  }, 0)
+  try {
+    engine.start()
+  } catch {
+    error = 'Allow the microphone for this site, then tap the mic again.'
+    clock.setTimeout(finish, 0)
+  }
+  return handle
+}
+
+function recordDictation(options: DictationOptions): Dictation {
+  let context: AudioContext
+  try {
+    context = new AudioContext()
+  } catch {
+    return failDictation(options, 'The microphone could not start. Tap it and speak again.')
+  }
   void context.resume()
   const pauseMs = options.multiline ? 1000 : 650
   const maxMs = options.multiline ? 12000 : 8000
@@ -45,12 +370,11 @@ export function startDictation(options: DictationOptions): Dictation {
   let noise = 0.004
   let cap = 0
 
-  const handle: MicHandle = {
+  const handle: Dictation = {
     hasAudio: () => pieces.length > 0,
     stop: () => finish(false),
     cancel: () => finish(true),
   }
-  registry().current = handle
   cap = window.setTimeout(() => finish(false), 15000)
 
   function finish(discard: boolean) {
@@ -93,7 +417,7 @@ export function startDictation(options: DictationOptions): Dictation {
       body.append('kind', options.kind)
       const result = await api<{ text: string }>('/api/speech', { method: 'POST', body, signal: AbortSignal.timeout(20000) })
       if (drop) return
-      const text = formatHeard(result.text ?? '', options.kind, true)
+      const text = spokenField(result.text ?? '', options.kind)
       if (text) options.onText(text)
       else options.onError('Could not hear that. Tap the mic and speak again.')
     } catch (error) {

@@ -59,6 +59,55 @@ public sealed class ShopDesk(VendorDeskDbContext db, IRentalPhotoStore photos) :
         }).ToList();
     }
 
+    public async Task<ShopReportDto> Report(Guid vendorId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var gstin = await db.Vendors.AsNoTracking().Where(vendor => vendor.Id == vendorId).Select(vendor => vendor.Gstin).FirstOrDefaultAsync(cancellationToken) ?? "";
+        var rows = await db.Rentals.AsNoTracking()
+            .Where(rental => rental.VendorId == vendorId)
+            .Select(rental => new
+            {
+                rental.Id,
+                rental.Number,
+                rental.CreatedOn,
+                rental.CustomerName,
+                rental.CustomerMobile,
+                rental.ReturnedOn,
+                rental.DiscountType,
+                rental.DiscountValue,
+                rental.TaxPercent,
+                rental.AdditionalFees,
+                Lines = rental.Lines.Select(line => new { line.ProductId, line.Name, line.Quantity, line.Days, line.StartDate, line.PricePerDay, line.DepositPerUnit })
+            })
+            .ToListAsync(cancellationToken);
+        var products = await db.CatalogProducts.AsNoTracking()
+            .Select(product => new { product.Id, product.Name, product.IsActive, Category = product.Category.Name })
+            .ToListAsync(cancellationToken);
+        var stocks = await db.VendorStocks.AsNoTracking()
+            .Where(item => item.VendorId == vendorId)
+            .Select(item => new { item.ProductId, item.Quantity, item.IsActive })
+            .ToListAsync(cancellationToken);
+        var rentals = rows.Select(row => new ReportRental(
+            row.Id,
+            row.Number,
+            row.CreatedOn,
+            row.CustomerName,
+            row.CustomerMobile,
+            row.ReturnedOn is not null,
+            row.DiscountType,
+            row.DiscountValue,
+            row.TaxPercent,
+            row.AdditionalFees,
+            row.Lines.Select(line => new ReportLine(line.ProductId, line.Name, line.Quantity, line.Days, line.StartDate, line.PricePerDay, line.DepositPerUnit)).ToList())).ToList();
+        var stock = new List<ReportStockItem>();
+        foreach (var product in products)
+        {
+            var row = stocks.FirstOrDefault(item => item.ProductId == product.Id);
+            if (row is null) continue;
+            stock.Add(new ReportStockItem(product.Id, product.Name, product.Category, row.Quantity, product.IsActive && row.IsActive));
+        }
+        return ReportMath.Build(RentalMath.IndiaToday(), from, to, gstin, rentals, stock);
+    }
+
     public async Task<RentalDetailDto?> Rental(Guid vendorId, Guid rentalId, CancellationToken cancellationToken)
     {
         var rental = await db.Rentals.AsNoTracking().Include(item => item.Lines).FirstOrDefaultAsync(item => item.Id == rentalId && item.VendorId == vendorId, cancellationToken);

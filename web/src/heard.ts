@@ -75,3 +75,35 @@ export function formatHeard(text: string, kind: 'text' | 'phone' | 'email', fina
   }
   return final ? titleCase(trimmed) : trimmed
 }
+
+export function bestLine(alternatives: { transcript?: string; confidence?: number }[], kind: 'text' | 'phone' | 'email'): string {
+  let best = ''
+  let score = Number.NEGATIVE_INFINITY
+  for (const alternative of alternatives) {
+    const transcript = (alternative.transcript ?? '').trim()
+    if (!transcript) continue
+    let value = alternative.confidence ?? 0
+    if (kind === 'phone') {
+      value += Math.min((transcript.match(/\d/g) ?? []).length, 10) / 15
+      if (/\b(double|triple|zero|one|two|three|four|five|six|seven|eight|nine)\b/i.test(transcript)) value += 0.25
+    }
+    if (kind === 'email' && /@|\b(at|dot|gmail|yahoo|hotmail|outlook)\b/i.test(transcript)) value += 0.35
+    if (value > score) {
+      score = value
+      best = transcript
+    }
+  }
+  return best
+}
+
+export function combineHeard(...parts: string[]): string {
+  return parts.map((part) => part.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+}
+
+/** Text that can be written into a rental field. Phone keeps digits only, so a half-heard sentence never replaces the number. */
+export function spokenField(raw: string, kind: 'text' | 'phone' | 'email'): string {
+  const cleaned = raw.replace(/[.?!]+$/g, '').replace(/\s+/g, ' ').trim()
+  if (!cleaned) return ''
+  if (kind === 'phone') return spokenPhone(cleaned)
+  return formatHeard(cleaned, kind, true)
+}

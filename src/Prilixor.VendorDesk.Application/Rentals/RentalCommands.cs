@@ -87,6 +87,7 @@ public interface IShopDesk
     Task<VendorProfile?> SaveProfile(SaveProfileCommand command, CancellationToken cancellationToken);
     Task<IReadOnlyList<CustomerDto>> Customers(Guid vendorId, CancellationToken cancellationToken);
     Task<IReadOnlyList<RentalListItemDto>> Rentals(Guid vendorId, CancellationToken cancellationToken);
+    Task<ShopReportDto> Report(Guid vendorId, DateOnly from, DateOnly to, CancellationToken cancellationToken);
     Task<RentalDetailDto?> Rental(Guid vendorId, Guid rentalId, CancellationToken cancellationToken);
     Task<Result<RentalDetailDto>> Create(CreateRentalCommand command, CancellationToken cancellationToken);
     Task<Result<RentalDetailDto>> Return(Guid vendorId, Guid rentalId, CancellationToken cancellationToken);

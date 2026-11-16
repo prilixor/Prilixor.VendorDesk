@@ -7,6 +7,7 @@ import { LoginPage } from './LoginPage'
 import { NewRentalPage } from './NewRentalPage'
 import { ProfilePage } from './ProfilePage'
 import { InvoicePage, RentalPage } from './RentalPage'
+import { ReportsPage } from './ReportsPage'
 import { Shell } from './Shell'
 
 export function App() {
@@ -36,6 +37,8 @@ function Desk({ vendor, setVendor }: { vendor: Vendor; setVendor: (vendor: Vendo
           <Route path="/" element={<DashboardPage vendor={vendor} />} />
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/rentals/new" element={<NewRentalPage vendor={vendor} />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/reports/:report" element={<ReportsPage />} />
           <Route path="/rentals/:id" element={<RentalPage />} />
           <Route path="/invoice/:id" element={<InvoicePage vendor={vendor} />} />
           <Route path="/profile" element={<ProfilePage vendor={vendor} onSaved={setVendor} />} />

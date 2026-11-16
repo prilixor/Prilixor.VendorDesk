@@ -1,10 +1,10 @@
 import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, ImagePlus, Mic, X } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { startDictation, type Dictation } from './dictate'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { micIsOn, seatMic, startDictation, stopActiveDictation, subscribeMic, unseatMic, type Dictation } from './dictate'
 import { inr, type totals } from './money'
 
 export function StatusBadge({ status }: { status: string }) {
-  const tone = status === 'Active' ? 'bg-[var(--success)]/15 text-[var(--success)]' : status === 'Due soon' ? 'bg-[var(--warning)]/25' : 'bg-slate-100 text-[var(--muted)]'
+  const tone = status === 'Active' ? 'bg-[var(--success)]/15 text-[var(--success)]' : status === 'Overdue' ? 'bg-[var(--danger)]/15 text-[var(--danger)]' : status === 'Due soon' || status === 'Due today' ? 'bg-[var(--warning)]/25' : 'bg-slate-100 text-[var(--muted)]'
   return <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${tone}`}>{status}</span>
 }
 
@@ -101,86 +101,82 @@ export function CategoryPicker({ categories, counts, value, onChange, className 
 
 function speakHint(label: string, kind: 'text' | 'phone' | 'email') {
   const name = label.toLowerCase()
-  if (kind === 'email') return 'Say the email with “at” and “dot”, such as rahul at gmail dot com. Pause, or tap the mic, when you finish.'
-  if (kind === 'phone') return `Say the ${name} digits. Say “double” when a digit repeats. Pause, or tap the mic, when you finish.`
-  return `Say the ${name}. Pause, or tap the mic, when you finish.`
+  if (kind === 'email') return 'Say the email with “at” and “dot”, such as rahul at gmail dot com. Tap the mic again when you finish.'
+  if (kind === 'phone') return `Say the ${name} digits. Say “double” when a digit repeats. Tap the mic again when you finish.`
+  return `Say the ${name}. Tap the mic again when you finish.`
 }
 
 export function MicField({ id, label, value, onChange, kind = 'text', error, optional, multiline, onFocus }: { id: string; label: string; value: string; onChange: (value: string) => void; kind?: 'text' | 'phone' | 'email'; error?: string; optional?: boolean; multiline?: boolean; onFocus?: () => void }) {
-  const [listening, setListening] = useState(false)
+  const listening = useSyncExternalStore(subscribeMic, () => micIsOn(id), () => false)
   const [status, setStatus] = useState('')
   const [hint, setHint] = useState('')
   const session = useRef<Dictation | null>(null)
-  const phase = useRef<'idle' | 'listen' | 'work'>('idle')
+  const phase = useRef<'idle' | 'listen'>('idle')
   const mounted = useRef(true)
-  const live = listening || status.startsWith('Listening')
-  const liveRef = useRef(live)
-  liveRef.current = live
+  const changeRef = useRef(onChange)
+  changeRef.current = onChange
+
+  function quiet() {
+    phase.current = 'idle'
+    if (!mounted.current) return
+    setStatus('')
+  }
 
   useEffect(() => () => {
     mounted.current = false
+    unseatMic(id)
     session.current?.cancel()
-  }, [])
+  }, [id])
 
   useEffect(() => {
-    if (!status.startsWith('Listening')) return
+    if (!listening) return
     const timer = window.setTimeout(() => {
+      if (!micIsOn(id)) return
       session.current?.stop()
-      window.setTimeout(() => {
-        if (phase.current === 'idle') return
-        if (!liveRef.current) return
-        session.current = null
-        phase.current = 'idle'
-        setListening(false)
-        setStatus('')
-        setHint('The microphone did not finish. Tap it and speak again.')
-      }, 800)
-    }, 10000)
+    }, 60000)
     return () => window.clearTimeout(timer)
-  }, [status])
+  }, [listening, id])
 
   function listen(event: { preventDefault: () => void; stopPropagation: () => void }) {
     event.preventDefault()
     event.stopPropagation()
-    if (phase.current === 'listen' || status.startsWith('Listening')) {
-      phase.current = 'work'
-      setListening(false)
-      setHint('')
-      setStatus('Working out what you said…')
+    if (micIsOn(id)) {
       session.current?.stop()
       return
     }
-    if (phase.current === 'work') return
     phase.current = 'listen'
     setHint('')
-    setListening(true)
-    setStatus('Listening… pause when you finish, or tap the mic.')
-    const mine = startDictation({
-      kind,
-      multiline: Boolean(multiline),
-      listeningMessage: 'Listening… pause when you finish, or tap the mic.',
-      onListen: (on) => { if (mounted.current && session.current === mine && phase.current === 'listen') setListening(on) },
-      onStatus: (message) => {
-        if (!mounted.current || session.current !== mine) return
-        if (message.startsWith('Listening') && phase.current === 'work') return
-        if (message.startsWith('Working')) {
-          phase.current = 'work'
-          setListening(false)
-        }
-        setStatus(message)
-      },
-      onText: (text) => { if (session.current === mine) onChange(text) },
-      onError: (message) => { if (mounted.current && session.current === mine) setHint(message) },
-      onEnd: () => {
-        if (session.current !== mine) return
-        session.current = null
-        phase.current = 'idle'
-        if (!mounted.current) return
-        setListening(false)
-        setStatus('')
-      },
+    setStatus('')
+    let mine: Dictation | null = null
+    let accept = true
+    seatMic(id, {
+      silence: quiet,
+      stop() { mine?.stop() },
     })
-    session.current = mine
+    try {
+      mine = startDictation({
+        kind,
+        multiline: Boolean(multiline),
+        listeningMessage: 'Listening…',
+        onListen: (on) => { if (!on) unseatMic(id) },
+        onStatus: (message) => { if (accept && mounted.current && !message.startsWith('Listening')) setStatus(message) },
+        onText: (text) => { if (accept) changeRef.current(text) },
+        onError: (message) => { if (accept && mounted.current) setHint(message) },
+        onEnd: () => {
+          accept = false
+          session.current = null
+          quiet()
+          unseatMic(id)
+        },
+      })
+      session.current = mine
+      if (!micIsOn(id)) quiet()
+    } catch {
+      session.current = null
+      quiet()
+      unseatMic(id)
+      setHint('The microphone could not start. Tap it and speak again.')
+    }
   }
 
   const guidance = speakHint(label, kind)
@@ -190,12 +186,13 @@ export function MicField({ id, label, value, onChange, kind = 'text', error, opt
       <label htmlFor={id}>{label} {optional ? <span className="font-normal text-[var(--muted)]">(optional)</span> : null}</label>
       <span className="flex gap-2">
         {multiline
-          ? <textarea id={id} className={`min-h-20 flex-1 rounded-md border px-3 py-2 font-normal ${error ? 'border-[var(--danger)]' : 'border-[var(--border)]'}`} value={value} onChange={(event) => onChange(event.target.value)} onFocus={onFocus} />
-          : <input id={id} inputMode={kind === 'phone' ? 'tel' : kind === 'email' ? 'email' : 'text'} className={`h-10 flex-1 rounded-md border px-3 font-normal ${error ? 'border-[var(--danger)]' : 'border-[var(--border)]'}`} value={value} onChange={(event) => onChange(event.target.value)} onFocus={onFocus} />}
-        <button className={`grid size-10 shrink-0 place-items-center rounded-md border bg-[var(--secondary)] ${live ? 'animate-pulse border-[var(--primary)] bg-[var(--primary)] text-white' : ''}`} type="button" aria-pressed={live} aria-label={`Voice input for ${label}`} title={guidance} onClick={listen}><Mic className="size-4" /></button>
+          ? <textarea id={id} className={`min-h-20 flex-1 rounded-md border px-3 py-2 font-normal ${error ? 'border-[var(--danger)]' : 'border-[var(--border)]'}`} value={value} onChange={(event) => onChange(event.target.value)} onFocus={() => { if (phase.current === 'idle') stopActiveDictation(); onFocus?.() }} />
+          : <input id={id} inputMode={kind === 'phone' ? 'tel' : kind === 'email' ? 'email' : 'text'} className={`h-10 flex-1 rounded-md border px-3 font-normal ${error ? 'border-[var(--danger)]' : 'border-[var(--border)]'}`} value={value} onChange={(event) => onChange(event.target.value)} onFocus={() => { if (phase.current === 'idle') stopActiveDictation(); onFocus?.() }} />}
+        <button className={`grid size-10 shrink-0 place-items-center rounded-md border bg-[var(--secondary)] ${listening ? 'animate-pulse border-[var(--primary)] bg-[var(--primary)] text-white' : ''}`} type="button" aria-pressed={listening} aria-label={`Voice input for ${label}`} title={guidance} onClick={listen}><Mic className="size-4" /></button>
       </span>
-      {status ? <span className="text-xs font-normal text-[var(--primary)]">{status}</span> : null}
-      {hint ? <span className="text-xs font-normal text-[var(--danger)]">{hint}</span> : null}
+      {listening ? <span className="text-xs font-normal text-[var(--primary)]" aria-live="polite">Listening… tap again to stop</span> : null}
+      {!listening && status && !status.startsWith('Listening') ? <span className="text-xs font-normal text-[var(--primary)]" aria-live="polite">{status}</span> : null}
+      {hint ? <span className="text-xs font-normal text-[var(--danger)]" aria-live="polite">{hint}</span> : null}
       {error ? <span className="text-xs font-normal text-[var(--danger)]">{error}</span> : null}
     </div>
   )

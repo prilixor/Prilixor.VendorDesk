@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, ApiError, type Customer, type InventoryRow, type RentalDetail, type Vendor } from './api'
 import { endDate, fmtDate, inr, lineCharge, today, totals, validCharges, validDuration, type ChargeInput } from './money'
 import { PageHeader } from './Shell'
+import { microphoneBlockedMessage } from './dictate'
 import { CategoryPicker, ChargesEditor, MicField, Pager, pageRows, PrimaryButton, ProductPhoto, TotalsCard } from './ui'
 
 const steps = [
@@ -182,7 +183,7 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
           charges,
         }),
       })
-      navigate(`/rentals/${saved.id}`)
+      navigate(`/rentals/${saved.id}`, { state: { from: '/' } })
     } catch (caught) {
       setErrors({ confirm: caught instanceof ApiError ? caught.message : 'The rental could not be saved.' })
     } finally {
@@ -198,7 +199,8 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
       {step === 0 ? (
         <section className="rounded-lg border bg-white p-4 md:p-6">
           <div className="space-y-6" ref={suggestBox}>
-            <p className="flex items-start gap-2 rounded-md bg-[var(--secondary)] px-3 py-2 text-xs"><Info className="mt-0.5 size-4 shrink-0" /> Type a name or mobile. If this person is already saved, choose them and the address and reference fill in. For the mic, tap it, speak, then pause or tap it again. The words are filled in after that.</p>
+            <p className="flex items-start gap-2 rounded-md bg-[var(--secondary)] px-3 py-2 text-xs"><Info className="mt-0.5 size-4 shrink-0" /> Type a name or mobile. If this person is already saved, choose them and the address and reference fill in. Tap one mic and speak into that box. The words appear as you talk. Tap that mic again when you finish, then tap the next mic.</p>
+            {!window.isSecureContext ? <p className="rounded-md bg-[var(--danger)]/10 px-3 py-2 text-xs font-normal text-[var(--danger)]">{microphoneBlockedMessage()}</p> : null}
             {linked ? (
               <div className="flex items-start justify-between gap-3 rounded-md border-l-2 border-[var(--primary)] bg-[var(--accent)] px-3 py-2 text-sm">
                 <span className="min-w-0"><Check className="mr-2 inline size-4 text-[var(--primary)]" /><strong>{linked.name}</strong> · {linked.mobile}{linked.address ? <span className="mt-0.5 block truncate text-xs font-normal text-[var(--muted)]">{linked.address}</span> : null}</span>
@@ -207,25 +209,25 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
             ) : null}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <MicField id="name" label="Customer name" value={form.name} onChange={(name) => { setForm({ ...form, name }); setSuggest('name') }} onFocus={() => setSuggest('name')} error={errors.name} />
+                <MicField id="name" label="Customer name" value={form.name} onChange={(name) => { setForm((current) => ({ ...current, name })); setSuggest('name') }} onFocus={() => setSuggest('name')} error={errors.name} />
                 {suggest === 'name' && suggestions.length ? <div className="mt-2 sm:hidden"><CustomerMatches items={suggestions} onPick={fillCustomer} /></div> : null}
               </div>
               <div>
-                <MicField id="mobile" label="Mobile" kind="phone" value={form.mobile} onChange={(mobile) => { setForm({ ...form, mobile }); setSuggest('mobile') }} onFocus={() => setSuggest('mobile')} error={errors.mobile} />
+                <MicField id="mobile" label="Mobile" kind="phone" value={form.mobile} onChange={(mobile) => { setForm((current) => ({ ...current, mobile })); setSuggest('mobile') }} onFocus={() => setSuggest('mobile')} error={errors.mobile} />
                 {suggest === 'mobile' && suggestions.length ? <div className="mt-2 sm:hidden"><CustomerMatches items={suggestions} onPick={fillCustomer} /></div> : null}
               </div>
               {suggest && suggestions.length ? <div className="hidden sm:col-span-2 sm:block"><CustomerMatches items={suggestions} onPick={fillCustomer} /></div> : null}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <MicField id="email" label="Email" kind="email" optional value={form.email} onChange={(email) => setForm({ ...form, email })} error={errors.email} />
-              <MicField id="address" label="Address" multiline value={form.address} onChange={(address) => setForm({ ...form, address })} error={errors.address} />
+              <MicField id="email" label="Email" kind="email" optional value={form.email} onChange={(email) => setForm((current) => ({ ...current, email }))} error={errors.email} />
+              <MicField id="address" label="Address" multiline value={form.address} onChange={(address) => setForm((current) => ({ ...current, address }))} error={errors.address} />
             </div>
             <div>
               <h3 className="mb-3 text-sm font-semibold">Reference person</h3>
               <div className="grid gap-4 sm:grid-cols-3">
-                <MicField id="refName" label="Name" value={form.refName} onChange={(refName) => setForm({ ...form, refName })} error={errors.refName} />
-                <MicField id="refMobile" label="Mobile" kind="phone" value={form.refMobile} onChange={(refMobile) => setForm({ ...form, refMobile })} error={errors.refMobile} />
-                <MicField id="refRelation" label="Relation" value={form.refRelation} onChange={(refRelation) => setForm({ ...form, refRelation })} error={errors.refRelation} />
+                <MicField id="refName" label="Name" value={form.refName} onChange={(refName) => setForm((current) => ({ ...current, refName }))} error={errors.refName} />
+                <MicField id="refMobile" label="Mobile" kind="phone" value={form.refMobile} onChange={(refMobile) => setForm((current) => ({ ...current, refMobile }))} error={errors.refMobile} />
+                <MicField id="refRelation" label="Relation" value={form.refRelation} onChange={(refRelation) => setForm((current) => ({ ...current, refRelation }))} error={errors.refRelation} />
               </div>
             </div>
           </div>

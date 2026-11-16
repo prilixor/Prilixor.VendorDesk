@@ -1,6 +1,6 @@
-import { CheckCircle2, FileText, Printer } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, FileText, Printer } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { api, ApiError, type RentalDetail, type Vendor } from './api'
 import { fmtDate, inr } from './money'
 import { PageHeader, ShopLogo } from './Shell'
@@ -8,6 +8,7 @@ import { StatusBadge, TotalsCard } from './ui'
 
 export function RentalPage() {
   const { id } = useParams()
+  const from = originOf(useLocation().state)
   const [rental, setRental] = useState<RentalDetail | null>(null)
   const [missing, setMissing] = useState(false)
   const [returning, setReturning] = useState(false)
@@ -29,13 +30,14 @@ export function RentalPage() {
     }
   }
 
-  if (missing) return <div className="mx-auto max-w-md py-20 text-center"><h1 className="text-xl font-semibold">Rental not found</h1><Link className="mt-6 inline-block font-semibold text-[var(--primary)]" to="/">Back to dashboard</Link></div>
+  if (missing) return <div className="mx-auto max-w-md py-20 text-center"><h1 className="text-xl font-semibold">Rental not found</h1><BackLink to={from} className="mt-6" /></div>
   if (!rental) return <p className="text-sm text-[var(--muted)]">Loading…</p>
   const createdToday = rental.createdOn === new Date().toISOString().slice(0, 10)
   return (
     <div className="min-w-0 w-full">
+      <BackLink to={from} />
       {createdToday ? <div className="mb-5 flex items-start gap-3 rounded-lg border border-[var(--success)]/40 bg-[var(--success)]/10 p-4 text-sm"><CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[var(--success)]" /><span>Rental confirmed. Invoice <strong>{rental.invoiceNo}</strong> was generated from this order.</span></div> : null}
-      <PageHeader title={`Rental ${rental.number}`} subtitle={`Created ${fmtDate(rental.createdOn)}`} action={<><Link className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm" to={`/invoice/${rental.id}`}><FileText className="size-4" /> View Invoice</Link><Link className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm" to={`/invoice/${rental.id}?print=1`}><Printer className="size-4" /> Print</Link>{rental.status !== 'Returned' ? <button className="rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" type="button" disabled={returning} onClick={() => void markReturned()}>{returning ? 'Saving…' : 'Mark returned'}</button> : null}</>} />
+      <PageHeader title={`Rental ${rental.number}`} subtitle={`Created ${fmtDate(rental.createdOn)}`} action={<><Link className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm" to={`/invoice/${rental.id}`} state={{ from }}><FileText className="size-4" /> View Invoice</Link><Link className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm" to={`/invoice/${rental.id}?print=1`} state={{ from }}><Printer className="size-4" /> Print</Link>{rental.status !== 'Returned' ? <button className="rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50" type="button" disabled={returning} onClick={() => void markReturned()}>{returning ? 'Saving…' : 'Mark returned'}</button> : null}</>} />
       {error ? <p className="mb-4 text-sm text-[var(--danger)]">{error}</p> : null}
       {rental.status === 'Returned' ? <div className="mb-5 rounded-lg border border-[var(--success)]/40 bg-[var(--success)]/10 p-4 text-sm">Equipment returned. The quantity is back in inventory, and the rental photos were removed.</div> : null}
       <div className="grid gap-4 md:grid-cols-[1fr_300px]">
@@ -65,6 +67,7 @@ export function RentalPage() {
 
 export function InvoicePage({ vendor }: { vendor: Vendor }) {
   const { id } = useParams()
+  const from = originOf(useLocation().state)
   const [rental, setRental] = useState<RentalDetail | null>(null)
   const [missing, setMissing] = useState(false)
   const print = new URLSearchParams(window.location.search).get('print') === '1'
@@ -80,7 +83,7 @@ export function InvoicePage({ vendor }: { vendor: Vendor }) {
   return (
     <div className="min-w-0 w-full">
       <div className="no-print mb-4 flex justify-between">
-        <Link className="text-sm font-medium" to={`/rentals/${rental.id}`}>Back to rental</Link>
+        <Link className="inline-flex items-center gap-1 text-sm font-medium text-[var(--primary)]" to={`/rentals/${rental.id}`} state={{ from }}><ChevronLeft className="size-4" /> Back to rental</Link>
         <button className="inline-flex items-center gap-2 rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white" type="button" onClick={() => window.print()}><Printer className="size-4" /> Print</button>
       </div>
       <article className="print-area rounded-lg border bg-white p-6 text-sm md:p-10">
@@ -130,3 +133,13 @@ export function InvoicePage({ vendor }: { vendor: Vendor }) {
     </div>
   )
 }
+
+function BackLink({ to, className = 'mb-4' }: { to: string; className?: string }) {
+  return <Link className={`no-print inline-flex items-center gap-1 text-sm font-medium text-[var(--primary)] ${className}`} to={to}><ChevronLeft className="size-4" /> Back</Link>
+}
+
+function originOf(state: unknown) {
+  if (state && typeof state === 'object' && 'from' in state && typeof state.from === 'string' && state.from.startsWith('/') && !state.from.startsWith('//')) return state.from
+  return '/'
+}
+

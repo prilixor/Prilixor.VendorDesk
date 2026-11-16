@@ -1,4 +1,4 @@
-import { Building2, LayoutDashboard, LogOut, Package, PlusCircle } from 'lucide-react'
+import { BarChart3, LayoutDashboard, LogOut, Package, PlusCircle } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { api, type Vendor } from './api'
@@ -7,11 +7,12 @@ const links = [
   { to: '/', label: 'Dashboard', short: 'Home', icon: LayoutDashboard },
   { to: '/inventory', label: 'Inventory', short: 'Stock', icon: Package },
   { to: '/rentals/new', label: 'New Rental', short: 'Rental', icon: PlusCircle },
-  { to: '/profile', label: 'Business details', short: 'Business', icon: Building2 },
+  { to: '/reports', label: 'Reports', short: 'Reports', icon: BarChart3 },
 ]
 
 function linkActive(to: string, path: string) {
   if (to === '/') return path === '/' || path.startsWith('/invoice') || (path.startsWith('/rentals/') && path !== '/rentals/new')
+  if (to === '/reports') return path === '/reports' || path.startsWith('/reports/')
   return path === to
 }
 
@@ -29,7 +30,7 @@ export function Shell({ vendor, onSignOut, children }: { vendor: Vendor; onSignO
     navigate('/login', { replace: true })
   }
   return (
-    <div className="flex h-dvh min-h-0 flex-col print:block print:h-auto md:h-auto md:min-h-screen md:flex-row">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden print:block print:h-auto print:overflow-visible md:h-auto md:min-h-screen md:flex-row md:overflow-visible">
       <aside className="no-print hidden w-60 shrink-0 flex-col text-[var(--sidebar-foreground)] md:flex" style={{ background: 'var(--sidebar)' }}>
         <div className="flex items-center gap-2 px-5 py-5">
           {vendor.logo ? <ShopLogo logo={vendor.logo} name={vendor.businessName} className="size-9 rounded-md" /> : <img src="/bm-icon.png" alt="BlinksMed" className="size-9 rounded-md" />}
@@ -45,22 +46,24 @@ export function Shell({ vendor, onSignOut, children }: { vendor: Vendor; onSignO
             </NavLink>
           ))}
         </nav>
-        <div className="mt-auto border-t border-white/10 px-5 py-4 text-xs">
-          <div className="font-medium text-white">{vendor.businessName || 'Complete business details'}</div>
-          <div className="opacity-70">{vendor.ownerName || vendor.city}</div>
-          <button className="mt-3 flex items-center gap-2 text-sm" type="button" onClick={() => void signOut()}><LogOut className="size-4" /> Sign out</button>
+        <div className="mt-auto border-t border-white/10 px-3 py-4 text-xs">
+          <NavLink to="/profile" aria-label="Business details" className={() => `block rounded-md px-2 py-2 ${path === '/profile' ? 'bg-[var(--sidebar-accent)]' : 'hover:bg-[var(--sidebar-accent)]'}`}>
+            <div className="font-medium text-white">{vendor.businessName || 'Complete business details'}</div>
+            <div className="opacity-70">{vendor.ownerName || vendor.city || 'Business details'}</div>
+          </NavLink>
+          <button className="mt-3 flex items-center gap-2 px-2 text-sm" type="button" onClick={() => void signOut()}><LogOut className="size-4" /> Sign out</button>
         </div>
       </aside>
-      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden md:overflow-visible">
         <header className="no-print flex shrink-0 items-center gap-3 px-4 py-3 text-white md:hidden" style={{ background: 'var(--sidebar)' }}>
           {vendor.logo ? <ShopLogo logo={vendor.logo} name={vendor.businessName} className="size-8 shrink-0 rounded-md" /> : <img src="/bm-icon.png" alt="BlinksMed" className="size-8 shrink-0 rounded-md" />}
-          <div className="min-w-0 flex-1">
+          <NavLink to="/profile" aria-label="Business details" className={() => `min-w-0 flex-1 rounded-md ${path === '/profile' ? 'bg-white/15 px-2 py-1' : ''}`}>
             <div className="font-semibold leading-tight">Vendor Desk</div>
             <div className="truncate text-xs opacity-80">{vendor.businessName || 'Business details'}</div>
-          </div>
+          </NavLink>
           <button className="flex shrink-0 items-center gap-1.5 rounded-md bg-white/15 px-3 py-2 text-sm font-medium" type="button" onClick={() => void signOut()}><LogOut className="size-4" /> Sign out</button>
         </header>
-        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 py-5 print:h-auto print:overflow-visible md:overflow-visible md:px-8 md:py-8">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 py-4 print:h-auto print:overflow-visible md:overflow-visible md:px-8 md:py-8">{children}</main>
         <nav className="no-print grid shrink-0 grid-cols-4 border-t bg-white pb-[env(safe-area-inset-bottom)] md:hidden">
           {links.map((link) => (
             <NavLink key={link.to} to={link.to} className={() => `flex min-w-0 flex-col items-center gap-1 px-1 py-2 text-[10px] leading-tight ${linkActive(link.to, path) ? 'text-[var(--primary)]' : 'text-[var(--muted)]'}`}>
@@ -75,7 +78,7 @@ export function Shell({ vendor, onSignOut, children }: { vendor: Vendor; onSignO
 
 export function PageHeader({ title, subtitle, action, mark }: { title: string; subtitle?: string; action?: ReactNode; mark?: ReactNode }) {
   return (
-    <div className="no-print mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+    <div className="no-print mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between md:mb-6">
       <div className="flex min-w-0 items-center gap-3">
         {mark}
         <div className="min-w-0">

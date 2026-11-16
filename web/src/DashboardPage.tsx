@@ -1,6 +1,6 @@
 import { ClipboardList, IndianRupee, Lock, Package, PlusCircle, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { api, type InventoryRow, type RentalListItem, type Vendor } from './api'
 import { fmtDate, inr } from './money'
 import { PageHeader, ShopLogo } from './Shell'
@@ -21,6 +21,8 @@ export function DashboardPage({ vendor }: { vendor: Vendor }) {
   const revenue = rentals.reduce((sum, rental) => sum + rental.taxable, 0)
   const unitsOut = active.reduce((sum, rental) => sum + rental.units, 0)
   const name = (vendor.ownerName || vendor.businessName).split(' ')[0]
+  const here = useLocation()
+  const from = here.pathname + here.search
   const categories = useMemo(() => ['All', ...new Set(rows.map((row) => row.categoryName))], [rows])
   const categoryCounts = useMemo(() => {
     const tally: Record<string, number> = { All: rows.length }
@@ -55,7 +57,7 @@ export function DashboardPage({ vendor }: { vendor: Vendor }) {
         <div className="border-b px-4 py-3 font-medium">Recent rentals</div>
         <div className="divide-y">
           {recent.rows.map((rental) => (
-            <Link key={rental.id} to={`/rentals/${rental.id}`} className="grid gap-1 px-4 py-3 text-sm hover:bg-slate-50 sm:grid-cols-[110px_minmax(0,1fr)_minmax(0,1fr)_140px_auto] sm:items-center">
+            <Link key={rental.id} to={`/rentals/${rental.id}`} state={{ from }} className="grid gap-1 px-4 py-3 text-sm hover:bg-slate-50 sm:grid-cols-[110px_minmax(0,1fr)_minmax(0,1fr)_140px_auto] sm:items-center">
               <span className="flex items-center justify-between gap-2 sm:block"><span className="font-mono text-xs text-[var(--muted)]">{rental.number}</span><span className="sm:hidden"><StatusBadge status={rental.status} /></span></span>
               <span className="font-medium">{rental.customerName}</span>
               <span className="truncate text-[var(--muted)]">{rental.itemNames.join(', ')}</span>
