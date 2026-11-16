@@ -7,6 +7,11 @@ import { PageHeader } from './Shell'
 import { microphoneBlockedMessage } from './dictate'
 import { CategoryPicker, ChargesEditor, MicField, Pager, pageRows, PrimaryButton, ProductPhoto, TotalsCard } from './ui'
 
+function referenceLine(name: string, relation: string, mobile: string) {
+  const person = [name.trim(), relation.trim() ? `(${relation.trim()})` : ''].filter(Boolean).join(' ')
+  return [person, mobile.trim()].filter(Boolean).join(' · ')
+}
+
 const steps = [
   { label: 'Customer', hint: 'Who is renting' },
   { label: 'Products', hint: 'What goes out' },
@@ -121,9 +126,7 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
     if (!/^[6-9]\d{9}$/.test(form.mobile.trim())) next.mobile = 'Enter a valid 10-digit mobile'
     if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) next.email = 'Enter a valid email'
     if (!form.address.trim()) next.address = 'Address is required'
-    if (!form.refName.trim()) next.refName = 'Reference name is required'
-    if (!/^[6-9]\d{9}$/.test(form.refMobile.trim())) next.refMobile = 'Enter a valid 10-digit mobile'
-    if (!form.refRelation.trim()) next.refRelation = 'Relation is required'
+    if (form.refMobile.trim() && !/^[6-9]\d{9}$/.test(form.refMobile.trim())) next.refMobile = 'Enter a valid 10-digit mobile'
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -225,9 +228,9 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
             <div>
               <h3 className="mb-3 text-sm font-semibold">Reference person</h3>
               <div className="grid gap-4 sm:grid-cols-3">
-                <MicField id="refName" label="Name" value={form.refName} onChange={(refName) => setForm((current) => ({ ...current, refName }))} error={errors.refName} />
-                <MicField id="refMobile" label="Mobile" kind="phone" value={form.refMobile} onChange={(refMobile) => setForm((current) => ({ ...current, refMobile }))} error={errors.refMobile} />
-                <MicField id="refRelation" label="Relation" value={form.refRelation} onChange={(refRelation) => setForm((current) => ({ ...current, refRelation }))} error={errors.refRelation} />
+                <MicField id="refName" label="Name" optional value={form.refName} onChange={(refName) => setForm((current) => ({ ...current, refName }))} error={errors.refName} />
+                <MicField id="refMobile" label="Mobile" kind="phone" optional value={form.refMobile} onChange={(refMobile) => setForm((current) => ({ ...current, refMobile }))} error={errors.refMobile} />
+                <MicField id="refRelation" label="Relation" optional value={form.refRelation} onChange={(refRelation) => setForm((current) => ({ ...current, refRelation }))} error={errors.refRelation} />
               </div>
             </div>
           </div>
@@ -328,7 +331,7 @@ export function NewRentalPage({ vendor }: { vendor: Vendor }) {
               <div className="font-medium">{customer.name}</div>
               <div className="text-[var(--muted)]">{customer.mobile}{customer.email ? ` · ${customer.email}` : ''}</div>
               <div className="text-[var(--muted)]">{customer.address}</div>
-              <div className="mt-2 text-xs text-[var(--muted)]">Reference: {customer.refName} ({customer.refRelation}) · {customer.refMobile}</div>
+              {referenceLine(customer.refName, customer.refRelation, customer.refMobile) ? <div className="mt-2 text-xs text-[var(--muted)]">Reference: {referenceLine(customer.refName, customer.refRelation, customer.refMobile)}</div> : null}
             </div>
             <div className="rounded-lg border bg-white text-sm">
               <div className="flex justify-between border-b p-4"><span className="font-medium">Items</span><button className="text-[var(--primary)]" type="button" onClick={() => setStep(1)}>Edit</button></div>

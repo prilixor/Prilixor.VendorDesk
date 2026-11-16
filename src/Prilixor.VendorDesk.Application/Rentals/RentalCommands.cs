@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using FluentValidation;
 using Prilixor.VendorDesk.Application.Abstractions;
 using Prilixor.VendorDesk.Application.Auth;
@@ -75,9 +76,9 @@ public sealed class CreateRentalCommandValidator : AbstractValidator<CreateRenta
             RuleFor(command => command.Customer!.Mobile).Matches(@"^[6-9]\d{9}$").WithMessage("Enter a valid 10-digit mobile.");
             RuleFor(command => command.Customer!.Email).MaximumLength(320).Must(email => string.IsNullOrWhiteSpace(email) || email.Contains('@')).WithMessage("Enter a valid email.");
             RuleFor(command => command.Customer!.Address).NotEmpty().MaximumLength(500);
-            RuleFor(command => command.Customer!.RefName).NotEmpty().MaximumLength(160);
-            RuleFor(command => command.Customer!.RefMobile).Matches(@"^[6-9]\d{9}$").WithMessage("Enter a valid 10-digit mobile.");
-            RuleFor(command => command.Customer!.RefRelation).NotEmpty().MaximumLength(80);
+            RuleFor(command => command.Customer!.RefName).MaximumLength(160);
+            RuleFor(command => command.Customer!.RefMobile).Must(mobile => string.IsNullOrWhiteSpace(mobile) || Regex.IsMatch(mobile.Trim(), @"^[6-9]\d{9}$")).WithMessage("Enter a valid 10-digit mobile.");
+            RuleFor(command => command.Customer!.RefRelation).MaximumLength(80);
         });
     }
 }

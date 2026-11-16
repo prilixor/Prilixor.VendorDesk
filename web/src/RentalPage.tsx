@@ -6,6 +6,11 @@ import { fmtDate, inr } from './money'
 import { PageHeader, ShopLogo } from './Shell'
 import { StatusBadge, TotalsCard } from './ui'
 
+function referenceLine(name: string, relation: string, mobile: string) {
+  const person = [name.trim(), relation.trim() ? `(${relation.trim()})` : ''].filter(Boolean).join(' ')
+  return [person, mobile.trim()].filter(Boolean).join(' · ')
+}
+
 export function RentalPage() {
   const { id } = useParams()
   const from = originOf(useLocation().state)
@@ -47,7 +52,7 @@ export function RentalPage() {
             <div className="font-medium">{rental.customer.name}</div>
             <div className="text-[var(--muted)]">{rental.customer.mobile}{rental.customer.email ? ` · ${rental.customer.email}` : ''}</div>
             <div className="text-[var(--muted)]">{rental.customer.address}</div>
-            <div className="mt-2 text-xs text-[var(--muted)]">Reference: {rental.customer.refName} ({rental.customer.refRelation}) · {rental.customer.refMobile}</div>
+            {referenceLine(rental.customer.refName, rental.customer.refRelation, rental.customer.refMobile) ? <div className="mt-2 text-xs text-[var(--muted)]">Reference: {referenceLine(rental.customer.refName, rental.customer.refRelation, rental.customer.refMobile)}</div> : null}
           </div>
           <div className="rounded-lg border bg-white text-sm">
             <div className="border-b p-4 font-medium">Items</div>
@@ -93,7 +98,7 @@ export function InvoicePage({ vendor }: { vendor: Vendor }) {
         </header>
         <section className="grid gap-4 border-b py-6 sm:grid-cols-2">
           <div><div className="mb-1 text-xs uppercase tracking-wide text-[var(--muted)]">Bill to</div><div className="font-medium">{rental.customer.name}</div><div>{rental.customer.mobile}{rental.customer.email ? ` · ${rental.customer.email}` : ''}</div><div className="text-[var(--muted)]">{rental.customer.address}</div></div>
-          <div><div className="mb-1 text-xs uppercase tracking-wide text-[var(--muted)]">Reference</div><div>{rental.customer.refName} ({rental.customer.refRelation})</div><div>{rental.customer.refMobile}</div></div>
+          {referenceLine(rental.customer.refName, rental.customer.refRelation, rental.customer.refMobile) ? <div><div className="mb-1 text-xs uppercase tracking-wide text-[var(--muted)]">Reference</div><div>{referenceLine(rental.customer.refName, rental.customer.refRelation, rental.customer.refMobile)}</div></div> : null}
         </section>
         <div className="space-y-4 py-6 md:hidden print:hidden">
           {rental.items.map((item) => (
